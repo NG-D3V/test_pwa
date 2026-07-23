@@ -45,40 +45,25 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install Bubblewrap
-        run: |
-          npm install -g @bubblewrap/cli
-          # Bubblewrap zum PATH hinzufügen
-          echo "export PATH=\$PATH:$(npm root -g)/bin" >> $GITHUB_ENV
-
-      - name: Build APK with Bubblewrap
+      - name: Build APK with npx
         run: |
           MANIFEST_URL="${{ steps.deployment.outputs.page_url }}manifest.json"
           echo "Using manifest from: $MANIFEST_URL"
           
-          # Erstelle die Android App mit Bubblewrap
-          mkdir -p android-app
-          cd android-app
-          
-          # Bubblewrap initialisieren
-          $(npm root -g)/bin/bubblewrap init \
+          # Bubblewrap mit npx ausführen
+          npx @bubblewrap/cli@latest init \
             --manifest "$MANIFEST_URL" \
             --package-name "io.github.ngd3v.testpwa" \
             --app-name "PWA Test App" \
             --app-version "1.0.0"
           
-          # APK bauen
-          $(npm root -g)/bin/bubblewrap build
-
-      - name: Find and Copy APK
-        run: |
-          # Ausgabeverzeichnis erstellen
-          mkdir -p apk-upload
+          npx @bubblewrap/cli@latest build
           
-          # APK finden und kopieren
-          find ./android-app -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
+          # APK finden
+          mkdir -p apk-upload
+          find . -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
           
           # Debug: Zeige ob APK gefunden wurde
           if [ -f "./apk-upload/pwa-app.apk" ]; then
@@ -86,7 +71,7 @@ jobs:
             ls -la ./apk-upload/
           else
             echo "❌ APK not found. Showing directory structure:"
-            find ./android-app -type f
+            find . -type f | grep -E "\.(apk|json|xml|properties|gradle)" | head -20
           fi
 
       - name: Upload APK as artifact
