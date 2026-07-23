@@ -1,4 +1,4 @@
-name: Build APK from PWA
+name: Build APK with PWABuilder
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 jobs:
-  deploy-and-build-apk:
+  build-apk:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -47,44 +47,24 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Bubblewrap CLI
-        run: |
-          npm install -g @bubblewrap/cli
-          # Stelle sicher, dass Bubblewrap im PATH ist
-          echo "$(npm root -g)/bin" >> $GITHUB_PATH
-
-      - name: Create Android App with Bubblewrap
+      - name: Build APK with PWABuilder
         run: |
           MANIFEST_URL="${{ steps.deployment.outputs.page_url }}manifest.json"
           echo "Using manifest from: $MANIFEST_URL"
           
-          # Erstelle ein Verzeichnis für die Android App
-          mkdir -p android-app
-          cd android-app
+          # PWABuilder CLI global installieren
+          npm install -g @pwabuilder/cli
           
-          # Bubblewrap initialisieren
-          bubblewrap init \
+          # APK bauen
+          pwabuilder package \
             --manifest "$MANIFEST_URL" \
-            --package-name "io.github.ngd3v.testpwa" \
-            --app-name "PWA Test App" \
-            --app-version "1.0.0"
+            --platform android \
+            --output ./apk-output \
+            --androidOptions '{"signingMode": "debug", "packageId": "io.github.ngd3v.testpwa"}'
           
-          # Die APK bauen
-          bubblewrap build
-
-      - name: Find and Copy APK
-        run: |
-          # Erstelle Ausgabeverzeichnis
+          # APK finden und umbenennen
           mkdir -p apk-upload
-          
-          # Finde die APK und kopiere sie
-          find ./android-app -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
-          
-          # Wenn keine APK gefunden wurde, zeige Verzeichnisstruktur für Debugging
-          if [ ! -f "./apk-upload/pwa-app.apk" ]; then
-            echo "APK not found. Showing directory structure:"
-            find ./android-app -type f
-          fi
+          find ./apk-output -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
 
       - name: Upload APK as artifact
         if: success()
