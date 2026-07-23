@@ -39,21 +39,46 @@ jobs:
           node-version: '20'
 
       - name: Install PWA Builder CLI
-        run: npm install -g @pwabuilder/cli
-
-      - name: Build APK from deployed PWA
         run: |
-          MANIFEST_URL="${{ steps.deployment.outputs.page_url }}/manifest.json"
-          pwabuilder package \
+          npm install -g @pwabuilder/cli
+          # Stelle sicher, dass pwabuilder im PATH ist
+          echo "$(npm root -g)/bin" >> $GITHUB_PATH
+
+      - name: Build APK using Bubblewrap
+        run: |
+          # Hole die manifest.json von der deployed Seite
+          MANIFEST_URL="${{ steps.deployment.outputs.page_url }}manifest.json"
+          echo "Using manifest from: $MANIFEST_URL"
+          
+          # Erstelle ein temporäres Verzeichnis für die App
+          mkdir -p app-build
+          cd app-build
+          
+          # Initialisiere ein Node.js Projekt
+          npm init -y
+          
+          # Installiere bubblewrap direkt
+          npm install @bubblewrap/cli
+          
+          # Erstelle die Android App mit Bubblewrap
+          npx @bubblewrap/cli init \
             --manifest "$MANIFEST_URL" \
-            --platform android \
-            --output ./apk-output \
-            --androidOptions '{"signingMode": "debug", "packageId": "io.github.ngd3v.testpwa"}'
-          # pwabuilder erzeugt die APK im Unterordner des Ausgabeverzeichnisses
+            --package-name "io.github.ngd3v.testpwa" \
+            --app-name "PWA Test App"
+          
+          # Baue die APK
+          npx @bubblewrap/cli build
+          
+          # Kopiere die APK in das Ausgabeverzeichnis
+          cd ..
           mkdir -p apk-upload
-          find ./apk-output -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
+          find app-build -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
+          
+          # Debug: Zeige an, ob die APK gefunden wurde
+          ls -la apk-upload/ || echo "No APK found"
 
       - name: Upload APK as artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: pwa-apk
