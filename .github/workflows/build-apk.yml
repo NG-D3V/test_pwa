@@ -3,9 +3,8 @@ name: Build APK from PWA
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:   # Erlaubt manuelles Starten
+  workflow_dispatch:
 
-# Berechtigungen für Pages-Deployment und Artifact-Upload
 permissions:
   contents: read
   pages: write
@@ -22,41 +21,44 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---- 1. PWA auf GitHub Pages veröffentlichen ----
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - name: Upload PWA artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .   # Alles im Wurzelverzeichnis hochladen
+          path: .
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # ---- 2. Mit Bubblewrap APK erzeugen ----
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
       - name: Initialize TWA project
         run: |
-          # URL der gerade veröffentlichten manifest.json
           MANIFEST_URL="${{ steps.deployment.outputs.page_url }}/manifest.json"
-          bubblewrap init --manifest="$MANIFEST_URL" --directory=./twa
+          bubblewrap init --manifest="$MANIFEST_URL" --directory=./twa --skip-jdk-check
 
-      - name: Build APK (mit Debug-Keystore)
+      - name: Build APK
         run: |
           cd twa
-          bubblewrap build --generateSigningKey
+          bubblewrap build --generateSigningKey --skip-prompt --skip-jdk-check
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: pwa-apk
-          path: twa/app-release-signed.apk   # oder app-debug.apk – Bubblewrap erzeugt dieses
+          path: twa/app-release-signed.apk
