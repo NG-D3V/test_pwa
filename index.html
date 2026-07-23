@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PWA Test</title>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f0f4ff; }
+    main { text-align: center; padding: 2rem; background: white; border-radius: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    button { margin-top: 1rem; padding: 0.75rem 1.5rem; font-size: 1rem; border: none; border-radius: 0.5rem; background: #0066ff; color: white; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>📱 PWA Test App</h1>
+    <p>Diese App läuft im Standalone-Modus und ist offlinefähig.</p>
+    <button id="installBtn" style="display:none;">App installieren</button>
+  </main>
+
+  <script>
+    // Service Worker registrieren
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+
+    // Installations-Prompt anzeigen (nur wenn noch nicht installiert)
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('installBtn').style.display = 'block';
+    });
+
+    document.getElementById('installBtn').addEventListener('click', () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('PWA installiert');
+          }
+          deferredPrompt = null;
+          document.getElementById('installBtn').style.display = 'none';
+        });
+      }
+    });
+  </script>
+</body>
+</html>
