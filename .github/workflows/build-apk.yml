@@ -38,31 +38,23 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
+      - name: Install PWA Builder CLI
+        run: npm install -g @pwabuilder/cli
 
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
-
-      - name: Initialize TWA project
+      - name: Build APK from deployed PWA
         run: |
           MANIFEST_URL="${{ steps.deployment.outputs.page_url }}/manifest.json"
-          bubblewrap init \
-            --manifest="$MANIFEST_URL" \
-            --directory=./twa \
-            --jdk-path="$JAVA_HOME" \
-            --skip-prompt
-
-      - name: Build APK
-        run: |
-          cd twa
-          bubblewrap build --generateSigningKey --skip-prompt
+          pwabuilder package \
+            --manifest "$MANIFEST_URL" \
+            --platform android \
+            --output ./apk-output \
+            --androidOptions '{"signingMode": "debug", "packageId": "io.github.ngd3v.testpwa"}'
+          # pwabuilder erzeugt die APK im Unterordner des Ausgabeverzeichnisses
+          mkdir -p apk-upload
+          find ./apk-output -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: pwa-apk
-          path: twa/app-release-signed.apk
+          path: apk-upload/pwa-app.apk
