@@ -1,71 +1,49 @@
-name: Build APK with PWABuilder
+name: Build APK
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload PWA artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-
+      - uses: actions/checkout@v4
+      
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Build APK with PWABuilder
-        run: |
-          MANIFEST_URL="${{ steps.deployment.outputs.page_url }}manifest.json"
-          echo "Using manifest from: $MANIFEST_URL"
           
-          # PWABuilder mit npx ausführen
+      - name: Build APK
+        run: |
+          # URL der deployed Seite
+          APP_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          MANIFEST_URL="${APP_URL}manifest.json"
+          
+          echo "Building APK from: $MANIFEST_URL"
+          
+          # APK mit npx bauen
           npx @pwabuilder/cli@latest package \
             --manifest "$MANIFEST_URL" \
             --platform android \
             --output ./apk-output \
             --androidOptions '{"signingMode": "debug", "packageId": "io.github.ngd3v.testpwa"}'
           
-          # APK finden und umbenennen
+          # APK für Upload vorbereiten
           mkdir -p apk-upload
-          find ./apk-output -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
+          find ./apk-output -name "*.apk" -exec cp {} ./apk-upload/app.apk \;
           
-          # Debug
-          if [ -f "./apk-upload/pwa-app.apk" ]; then
-            echo "✅ APK successfully created!"
-            ls -la ./apk-upload/
-          else
-            echo "❌ APK not found. Showing directory structure:"
-            find ./apk-output -type f
-          fi
-
-      - name: Upload APK as artifact
-        if: success()
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: pwa-apk
-          path: apk-upload/pwa-app.apk
+          name: app-apk
+          path: apk-upload/app.apk
