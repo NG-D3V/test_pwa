@@ -1,0 +1,62 @@
+name: Build APK from PWA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # Erlaubt manuelles Starten
+
+# Berechtigungen für Pages-Deployment und Artifact-Upload
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy-and-build-apk:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---- 1. PWA auf GitHub Pages veröffentlichen ----
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload PWA artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .   # Alles im Wurzelverzeichnis hochladen
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      # ---- 2. Mit Bubblewrap APK erzeugen ----
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Initialize TWA project
+        run: |
+          # URL der gerade veröffentlichten manifest.json
+          MANIFEST_URL="${{ steps.deployment.outputs.page_url }}/manifest.json"
+          bubblewrap init --manifest="$MANIFEST_URL" --directory=./twa
+
+      - name: Build APK (mit Debug-Keystore)
+        run: |
+          cd twa
+          bubblewrap build --generateSigningKey
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwa-apk
+          path: twa/app-release-signed.apk   # oder app-debug.apk – Bubblewrap erzeugt dieses
