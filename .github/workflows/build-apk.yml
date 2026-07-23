@@ -50,7 +50,11 @@ jobs:
       - name: Initialize TWA project
         run: |
           MANIFEST_URL="${{ steps.deployment.outputs.page_url }}/manifest.json"
-          echo "No" | bubblewrap init --manifest="$MANIFEST_URL" --directory=./twa --skip-prompt
+          bubblewrap init \
+            --manifest="$MANIFEST_URL" \
+            --directory=./twa \
+            --jdk-path="$JAVA_HOME" \
+            --skip-prompt
 
       - name: Build APK
         run: |
