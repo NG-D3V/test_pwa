@@ -1,4 +1,4 @@
-name: Build APK from PWA
+name: Build APK with PWABuilder
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 jobs:
-  deploy-and-build-apk:
+  build-apk:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -33,45 +33,34 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Setup Java (für Android Build)
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Build APK with npx
+      - name: Build APK with PWABuilder
         run: |
           MANIFEST_URL="${{ steps.deployment.outputs.page_url }}manifest.json"
           echo "Using manifest from: $MANIFEST_URL"
           
-          # Bubblewrap mit npx ausführen
-          npx @bubblewrap/cli@latest init \
+          # PWABuilder mit npx ausführen
+          npx @pwabuilder/cli@latest package \
             --manifest "$MANIFEST_URL" \
-            --package-name "io.github.ngd3v.testpwa" \
-            --app-name "PWA Test App" \
-            --app-version "1.0.0"
+            --platform android \
+            --output ./apk-output \
+            --androidOptions '{"signingMode": "debug", "packageId": "io.github.ngd3v.testpwa"}'
           
-          npx @bubblewrap/cli@latest build
-          
-          # APK finden
+          # APK finden und umbenennen
           mkdir -p apk-upload
-          find . -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
+          find ./apk-output -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
           
-          # Debug: Zeige ob APK gefunden wurde
+          # Debug
           if [ -f "./apk-upload/pwa-app.apk" ]; then
             echo "✅ APK successfully created!"
             ls -la ./apk-upload/
           else
             echo "❌ APK not found. Showing directory structure:"
-            find . -type f | grep -E "\.(apk|json|xml|properties|gradle)" | head -20
+            find ./apk-output -type f
           fi
 
       - name: Upload APK as artifact
