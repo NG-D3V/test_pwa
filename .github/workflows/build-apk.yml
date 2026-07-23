@@ -1,4 +1,4 @@
-name: Build APK from PWA
+name: Build APK with pwa2apk
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 jobs:
-  deploy-and-build-apk:
+  build-apk:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -33,49 +33,32 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+      - name: Setup Java (für Android Build)
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install PWA Builder CLI
-        run: |
-          npm install -g @pwabuilder/cli
-          # Stelle sicher, dass pwabuilder im PATH ist
-          echo "$(npm root -g)/bin" >> $GITHUB_PATH
+      - name: Install pwa2apk
+        run: npm install -g pwa2apk
 
-      - name: Build APK using Bubblewrap
+      - name: Build APK
         run: |
-          # Hole die manifest.json von der deployed Seite
-          MANIFEST_URL="${{ steps.deployment.outputs.page_url }}manifest.json"
-          echo "Using manifest from: $MANIFEST_URL"
+          APP_URL="${{ steps.deployment.outputs.page_url }}"
+          echo "Building APK from: $APP_URL"
+          pwa2apk "$APP_URL" --output ./apk-output
           
-          # Erstelle ein temporäres Verzeichnis für die App
-          mkdir -p app-build
-          cd app-build
-          
-          # Initialisiere ein Node.js Projekt
-          npm init -y
-          
-          # Installiere bubblewrap direkt
-          npm install @bubblewrap/cli
-          
-          # Erstelle die Android App mit Bubblewrap
-          npx @bubblewrap/cli init \
-            --manifest "$MANIFEST_URL" \
-            --package-name "io.github.ngd3v.testpwa" \
-            --app-name "PWA Test App"
-          
-          # Baue die APK
-          npx @bubblewrap/cli build
-          
-          # Kopiere die APK in das Ausgabeverzeichnis
-          cd ..
+          # Erstelle apk-upload Verzeichnis und kopiere die APK
           mkdir -p apk-upload
-          find app-build -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
-          
-          # Debug: Zeige an, ob die APK gefunden wurde
-          ls -la apk-upload/ || echo "No APK found"
+          find apk-output -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
 
       - name: Upload APK as artifact
         if: success()
