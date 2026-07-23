@@ -1,52 +1,94 @@
-name: Build Android APK
+name: Build APK from PWA
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
-  build:
+  deploy-and-build-apk:
     runs-on: ubuntu-latest
-    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload PWA artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          publish_branch: gh-pages
-          
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Setup Java (für Android Build)
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          
-      - name: Install PWABuilder
-        run: npm install -g @pwabuilder/cli
-        
-      - name: Build APK
+
+      - name: Install Bubblewrap CLI
         run: |
-          # Warte kurz, bis GitHub Pages bereit ist
-          sleep 10
+          npm install -g @bubblewrap/cli
+          # Stelle sicher, dass Bubblewrap im PATH ist
+          echo "$(npm root -g)/bin" >> $GITHUB_PATH
+
+      - name: Create Android App with Bubblewrap
+        run: |
+          MANIFEST_URL="${{ steps.deployment.outputs.page_url }}manifest.json"
+          echo "Using manifest from: $MANIFEST_URL"
           
-          # URL der deployed Seite
-          APP_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
-          MANIFEST_URL="${APP_URL}manifest.json"
+          # Erstelle ein Verzeichnis für die Android App
+          mkdir -p android-app
+          cd android-app
           
-          echo "Building APK from: $MANIFEST_URL"
-          
-          # APK bauen
-          pwabuilder package \
+          # Bubblewrap initialisieren
+          bubblewrap init \
             --manifest "$MANIFEST_URL" \
-            --platform android \
-            --output ./apk-output \
-            --androidOptions '{"signingMode": "debug", "packageId": "io.github.ngd3v.testpwa"}'
+            --package-name "io.github.ngd3v.testpwa" \
+            --app-name "PWA Test App" \
+            --app-version "1.0.0"
           
-      - name: Upload APK
+          # Die APK bauen
+          bubblewrap build
+
+      - name: Find and Copy APK
+        run: |
+          # Erstelle Ausgabeverzeichnis
+          mkdir -p apk-upload
+          
+          # Finde die APK und kopiere sie
+          find ./android-app -name "*.apk" -exec cp {} ./apk-upload/pwa-app.apk \;
+          
+          # Wenn keine APK gefunden wurde, zeige Verzeichnisstruktur für Debugging
+          if [ ! -f "./apk-upload/pwa-app.apk" ]; then
+            echo "APK not found. Showing directory structure:"
+            find ./android-app -type f
+          fi
+
+      - name: Upload APK as artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: app-apk
-          path: apk-output/**/*.apk
+          name: pwa-apk
+          path: apk-upload/pwa-app.apk
