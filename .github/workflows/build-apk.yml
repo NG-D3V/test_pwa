@@ -50,12 +50,12 @@ jobs:
       - name: Initialize TWA project
         run: |
           MANIFEST_URL="${{ steps.deployment.outputs.page_url }}/manifest.json"
-          bubblewrap init --manifest="$MANIFEST_URL" --directory=./twa --skip-jdk-check
+          bubblewrap init --manifest="$MANIFEST_URL" --directory=./twa --skip-prompt
 
       - name: Build APK
         run: |
           cd twa
-          bubblewrap build --generateSigningKey --skip-prompt --skip-jdk-check
+          bubblewrap build --generateSigningKey --skip-prompt
 
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
